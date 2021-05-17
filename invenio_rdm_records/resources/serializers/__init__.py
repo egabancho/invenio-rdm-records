@@ -12,6 +12,7 @@
 from .csl import CSLJSONSerializer, StringCitationSerializer
 from .datacite import DataCite43JSONSerializer, DataCite43XMLSerializer
 from .dublincore import DublinCoreJSONSerializer, DublinCoreXMLSerializer
+from .iiifp import IIIFPresiSchema
 from .ui import UIJSONSerializer
 
 __all__ = (
@@ -20,6 +21,7 @@ __all__ = (
     "DataCite43XMLSerializer",
     "DublinCoreJSONSerializer",
     "DublinCoreXMLSerializer",
+    "IIIFPresiSchema",
     "StringCitationSerializer",
     "UIJSONSerializer",
 )

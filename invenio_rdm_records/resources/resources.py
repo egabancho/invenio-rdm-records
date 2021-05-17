@@ -3,18 +3,32 @@
 # Copyright (C) 2020-2021 CERN.
 # Copyright (C) 2020 Northwestern University.
 # Copyright (C) 2021 TU Wien.
+# Copyright (C) 2021 data-futures.
 #
 # Invenio-RDM-Records is free software; you can redistribute it and/or modify
 # it under the terms of the MIT License; see LICENSE file for more details.
 
 """Bibliographic Record Resource."""
 
+from functools import partial
+
 from flask import abort, g
 from flask.globals import request
-from flask_resources import resource_requestctx, response_handler, route
+from flask_resources import MarshmallowJSONSerializer, ResponseHandler, \
+    resource_requestctx, response_handler, route, with_content_negotiation
 from invenio_drafts_resources.resources import RecordResource
 from invenio_records_resources.resources.records.resource import \
     request_data, request_headers, request_search_args, request_view_args
+
+from .serializers import IIIFPresiSchema
+
+with_iiif_content_negotiation = with_content_negotiation(
+    response_handlers={
+        "application/ld+json": ResponseHandler(
+            MarshmallowJSONSerializer(schema_cls=IIIFPresiSchema)),
+    },
+    default_accept_mimetype='application/ld+json',
+)
 
 
 class RDMRecordResource(RecordResource):
@@ -28,7 +42,7 @@ class RDMRecordResource(RecordResource):
             return f"{self.config.url_prefix}{route}"
 
         routes = self.config.routes
-        url_rules = super(RDMRecordResource, self).create_url_rules()
+        url_rules = super().create_url_rules()
         url_rules += [
             route("POST", p(routes["item-pids-reserve"]), self.pids_reserve),
             route("DELETE", p(routes["item-pids-reserve"]), self.pids_discard),
@@ -36,6 +50,18 @@ class RDMRecordResource(RecordResource):
             route("PUT", p(routes["item-review"]), self.review_update),
             route("DELETE", p(routes["item-review"]), self.review_delete),
             route("POST", p(routes["item-actions-review"]), self.review_submit)
+            route(
+                "GET",
+                p(routes["item-iiif-manifest"]),
+                partial(self.read_iiif_manifest, draft=False),
+                apply_decorators=False
+            ),
+            route(
+                "GET",
+                p(routes["item-draft-iiif-manifest"]),
+                partial(self.read_iiif_manifest, draft=True),
+                apply_decorators=False
+            ),
         ]
 
         return url_rules
@@ -119,6 +145,21 @@ class RDMRecordResource(RecordResource):
         )
 
         return item.to_dict(), 200
+
+    #
+    # IIIF Manifest - not all clients support content-negotiation so we need a
+    # full endpoint.
+    #
+    @cross_origin(origin="*", methods=["GET"])
+    @with_iiif_content_negotiation
+    @request_view_args
+    @response_handler()
+    def read_iiif_manifest(self, draft=False):
+        """Return IIIF Manifest."""
+        pid = resource_requestctx.view_args["pid_value"]
+        read = self.service.read_draft if draft else self.service.read
+        record = read(id_=pid, identity=g.identity)
+        return record, 200
 
 
 #

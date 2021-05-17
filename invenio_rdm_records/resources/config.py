@@ -30,7 +30,6 @@ def csl_url_args_retriever():
     locale = resource_requestctx.args.get("locale")
     return style, locale
 
-
 #
 # Response handlers
 #
@@ -70,6 +69,9 @@ class RDMRecordResourceConfig(RecordResourceConfig):
     # Review
     routes["item-review"] = "/<pid_value>/draft/review"
     routes["item-actions-review"] = "/<pid_value>/draft/actions/submit-review"
+    # IIIF
+    routes["item-iiif-manifest"] = "/<pid_value>/iiif/manifest"
+    routes["item-draft-iiif-manifest"] = "/<pid_value>/draft/iiif/manifest"
 
     request_view_args = {
         "pid_value": ma.fields.Str(),
