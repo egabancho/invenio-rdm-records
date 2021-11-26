@@ -4,6 +4,7 @@
 # Copyright (C) 2020-2021 Northwestern University.
 # Copyright (C)      2021 TU Wien.
 # Copyright (C)      2021 Graz University of Technology.
+# Copyright (C) 2022 Esteban J. G. Gabancho
 #
 # Invenio-RDM-Records is free software; you can redistribute it and/or modify
 # it under the terms of the MIT License; see LICENSE file for more details.
@@ -146,6 +147,11 @@ class RDMRecordServiceConfig(RecordServiceConfig, RecordConfigMixin):
                 f"pid_{scheme}": pid["identifier"]
                 for (scheme, pid) in record.pids.items()
             })
+        ),
+        'self_iiif_manifest': ConditionalLink(
+            cond=is_record,
+            if_=RecordLink("{+api}/records/{id}/iiif/manifest"),
+            else_=RecordLink("{+api}/records/{id}/draft/iiif/manifest")
         ),
         "files": ConditionalLink(
             cond=is_record,

@@ -4,6 +4,7 @@
 # Copyright (C) 2020 Northwestern University.
 # Copyright (C) 2021 TU Wien.
 # Copyright (C) 2021 data-futures.
+# Copyright (C) 2022 Esteban J. G. Gabancho
 #
 # Invenio-RDM-Records is free software; you can redistribute it and/or modify
 # it under the terms of the MIT License; see LICENSE file for more details.
@@ -14,18 +15,19 @@ from functools import partial
 
 from flask import abort, g
 from flask.globals import request
+from flask_cors import cross_origin
 from flask_resources import MarshmallowJSONSerializer, ResponseHandler, \
     resource_requestctx, response_handler, route, with_content_negotiation
 from invenio_drafts_resources.resources import RecordResource
 from invenio_records_resources.resources.records.resource import \
     request_data, request_headers, request_search_args, request_view_args
 
-from .serializers import IIIFPresiSchema
+from .serializers import IIIFPresiV2JSONSerializer
 
 with_iiif_content_negotiation = with_content_negotiation(
     response_handlers={
         "application/ld+json": ResponseHandler(
-            MarshmallowJSONSerializer(schema_cls=IIIFPresiSchema)),
+            IIIFPresiV2JSONSerializer()),
     },
     default_accept_mimetype='application/ld+json',
 )
@@ -49,19 +51,9 @@ class RDMRecordResource(RecordResource):
             route("GET", p(routes["item-review"]), self.review_read),
             route("PUT", p(routes["item-review"]), self.review_update),
             route("DELETE", p(routes["item-review"]), self.review_delete),
-            route("POST", p(routes["item-actions-review"]), self.review_submit)
-            route(
-                "GET",
-                p(routes["item-iiif-manifest"]),
-                partial(self.read_iiif_manifest, draft=False),
-                apply_decorators=False
-            ),
-            route(
-                "GET",
-                p(routes["item-draft-iiif-manifest"]),
-                partial(self.read_iiif_manifest, draft=True),
-                apply_decorators=False
-            ),
+            route("POST", p(routes["item-actions-review"]), self.review_submit),
+            route("GET", p(routes["item-iiif-manifest"]), self.read_iiif_manifest),
+            route("GET", p(routes["item-draft-iiif-manifest"]), self.read_iiif_draft_manifest),
         ]
 
         return url_rules
@@ -150,17 +142,32 @@ class RDMRecordResource(RecordResource):
     # IIIF Manifest - not all clients support content-negotiation so we need a
     # full endpoint.
     #
+    # See https://iiif.io/api/presentation/2.1/#responses on
+    # "Access-Control-Allow-Origin: *"
+    #
     @cross_origin(origin="*", methods=["GET"])
     @with_iiif_content_negotiation
     @request_view_args
     @response_handler()
-    def read_iiif_manifest(self, draft=False):
+    def read_iiif_manifest(self):
         """Return IIIF Manifest."""
         pid = resource_requestctx.view_args["pid_value"]
-        read = self.service.read_draft if draft else self.service.read
-        record = read(id_=pid, identity=g.identity)
+        record = self.service.read(id_=pid, identity=g.identity)
+        files = self.service.files.list_files(id_=pid, identity=g.identity)
+        record.files = files
         return record, 200
 
+    @cross_origin(origin="*", methods=["GET"])
+    @with_iiif_content_negotiation
+    @request_view_args
+    @response_handler()
+    def read_iiif_draft_manifest(self):
+        """Return IIIF Manifest."""
+        pid = resource_requestctx.view_args["pid_value"]
+        draft = self.service.read_draft(id_=pid, identity=g.identity)
+        files = self.service.draft_files.list_files(id_=pid, identity=g.identity)
+        draft.files = files
+        return draft, 200
 
 #
 # Parent Record Links
